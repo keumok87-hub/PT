@@ -242,7 +242,8 @@ function render(){
     <p class="msg" id="msg">${esc(msg)}</p>
     <div class="row"><button onclick="start()">⚽ 시작하기</button>
     <button class="alt" onclick="sample()">예시 팀 채우기</button>
-    <button class="alt" onclick="shuffleNames()">팀 섞기 (추첨)</button></div>`;
+    <button class="alt" onclick="shuffleNames()">팀 섞기 (추첨)</button>
+    <button class="alt" onclick="clearNames()">🧹 모두 지우기</button></div>`;
     app.querySelectorAll('.team-in input').forEach((el,i)=>el.addEventListener('input',()=>{draft[i]=el.value;save()}));
     return;
   }
@@ -260,6 +261,7 @@ function render(){
 }
 function setTab(r){if(rolling)return;S.tab=r;save();render()}
 function sample(){draft=SAMPLE.slice();render();save()}
+function clearNames(){draft=Array(16).fill('');msg='';render();save();const el=$('#t0');el&&el.focus()}
 function shuffleNames(){
   const names=draft.map(t=>t.trim());
   for(let i=names.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[names[i],names[j]]=[names[j],names[i]]}
