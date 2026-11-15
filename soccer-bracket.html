@@ -71,6 +71,17 @@ summary{cursor:pointer;padding:4px 0}
 .manual button{font-size:15px;padding:8px 14px}
 .wait{color:var(--muted);text-align:center;padding:14px 0 4px}
 
+/* 승부차기 */
+.pk{margin-top:12px;border:2px dashed var(--dice);border-radius:14px;padding:10px 8px;background:var(--bg)}
+.pkrow{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.pkside{text-align:center;padding:6px 4px;border-radius:12px;min-width:0}
+.pkside.win{background:var(--win);box-shadow:0 0 0 3px var(--dice)}
+.pkname{font-family:var(--display);font-size:16px;overflow-wrap:anywhere}
+.die.sm{width:52px;height:52px;font-size:30px}
+.pkmid{font-family:var(--display);color:var(--dice);font-size:16px}
+.pkn{margin:10px 0 0;text-align:center;font-family:var(--display);font-size:19px;min-height:1.4em}
+.next{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;background:var(--win);border-radius:16px;padding:12px 16px;margin:0 0 14px;font-family:var(--display);font-size:20px}
+
 /* overview bracket */
 .over{margin-top:34px}
 .bracket{display:flex;gap:18px;overflow-x:auto;padding:4px 2px 12px}
@@ -125,17 +136,46 @@ const d6=()=>1+Math.floor(Math.random()*6);
 function record(r,i,sa,sb){
   const x=S.m[r][i];
   x.sa=sa;x.sb=sb;x.pk=null;
-  if(sa===sb){ // 동점이면 승부차기: 주사위로 다시 겨루기
-    let a,b;do{a=d6();b=d6()}while(a===b);
-    x.pk=[a,b];
-  }
-  x.done=true;
+  if(sa===sb){x.tie=true;save();render();return} // 동점: 승부차기 버튼을 눌러야 진행
+  finish(r,i);
+}
+function finish(r,i){
+  const x=S.m[r][i];
+  x.tie=false;x.done=true;
   if(r<3){S.m[r+1][i>>1][i%2?'b':'a']=winnerOf(x)}
-  const cr=curRound();
-  if(cr<4&&cr>r)S.tab=cr;
   save();
   if(champion())confetti();
   render();
+}
+function pkRoll(r,i){
+  if(rolling)return;
+  rolling=true;
+  const x=S.m[r][i];
+  const pa=$('#pa'+i),pb=$('#pb'+i),note=$('#pkn'+i);
+  document.querySelectorAll('.actions button').forEach(b=>b.disabled=true);
+  const go=()=>{
+    pa.classList.add('rolling');pb.classList.add('rolling');
+    pa.closest('.pk').querySelectorAll('.pkside').forEach(e=>e.classList.remove('win'));
+    note.textContent='승부차기 주사위가 굴러가요...';
+    const t=setInterval(()=>{pa.textContent=d6();pb.textContent=d6()},90);
+    setTimeout(()=>{
+      clearInterval(t);
+      const a=d6(),b=d6();
+      pa.textContent=a;pb.textContent=b;
+      pa.classList.remove('rolling');pb.classList.remove('rolling');
+      if(a===b){note.textContent=`또 ${a} : ${b} 같아요! 다시 던져요`;setTimeout(go,2000);return}
+      (a>b?pa:pb).closest('.pkside').classList.add('win');
+      note.textContent=`${a>b?x.a:x.b} 승리! (승부차기 ${a} : ${b})`;
+      setTimeout(()=>{x.pk=[a,b];rolling=false;finish(r,i)},3500);
+    },1500);
+  };
+  go();
+}
+function pkBlock(i,x){
+  const w=x.pk?winnerOf(x):null;
+  const side=(n,id,v,isW)=>`<div class="pkside${isW?' win':''}"><div class="pkname">${esc(n)}</div><div class="die sm" id="${id}">${v}</div></div>`;
+  return `<div class="pk"><div class="pkrow">${side(x.a,'pa'+i,x.pk?x.pk[0]:'🎲',w===x.a)}<div class="pkmid">승부차기</div>${side(x.b,'pb'+i,x.pk?x.pk[1]:'🎲',w===x.b)}</div>
+  <p class="pkn" id="pkn${i}">${x.pk?`${esc(w)} 승리! (승부차기 ${x.pk[0]} : ${x.pk[1]})`:'동점이에요! 승부차기 주사위로 승부를 가려요'}</p></div>`;
 }
 
 function roll(r,i){
@@ -166,9 +206,10 @@ function matchCard(r,i){
   let h=`<div class="match${x.done?' done':''}"><h3>${ROUNDS[r]} 경기 ${i+1}</h3><div class="vs">`;
   const wA=x.done&&winnerOf(x)===x.a, wB=x.done&&winnerOf(x)===x.b;
   const side=(n,id,sc,w,l)=>`<div class="side${w?' win':''}${l?' lose':''}"><div class="name">${n?esc(n):'?'}</div><div class="die" id="${id}">${sc===null?'🎲':sc}</div></div>`;
-  h+=side(x.a,'da'+i,x.sa,wA,x.done&&!wA)+`<div class="mid">${x.done?`${x.sa} : ${x.sb}${x.pk?`<small>승부차기 ${x.pk[0]}:${x.pk[1]}</small>`:''}`:'VS'}</div>`+side(x.b,'db'+i,x.sb,wB,x.done&&!wB);
+  h+=side(x.a,'da'+i,x.sa,wA,x.done&&!wA)+`<div class="mid">${x.done||x.tie?`${x.sa} : ${x.sb}${x.tie?'<small>동점!</small>':x.pk?`<small>승부차기 ${x.pk[0]}:${x.pk[1]}</small>`:''}`:'VS'}</div>`+side(x.b,'db'+i,x.sb,wB,x.done&&!wB);
   h+='</div>';
-  if(x.done){h+=`<p class="wait">🏆 ${esc(winnerOf(x))} 승!</p>`}
+  if(x.tie){h+=pkBlock(i,x)+`<div class="actions"><button class="dice" onclick="pkRoll(${r},${i})">⚽ 승부차기 던지기!</button></div>`}
+  else if(x.done){h+=(x.pk?pkBlock(i,x):'')+`<p class="wait">🏆 ${esc(winnerOf(x))} 승!</p>`}
   else if(ready){
     h+=`<div class="actions"><button class="dice" onclick="roll(${r},${i})">🎲 주사위 던지기</button>
     <details><summary>진짜 주사위로 던졌어요 (직접 입력)</summary>
@@ -206,6 +247,7 @@ function render(){
   h+=`<div class="tabs" role="tablist">${ROUNDS.map((n,r)=>{
     const done=S.m[r].filter(x=>x.done).length;
     return `<button class="tab" role="tab" aria-selected="${S.tab===r}" ${r>cr&&!ch?'disabled':''} onclick="setTab(${r})">${n}<span class="n">${done}/${S.m[r].length}</span></button>`}).join('')}</div>`;
+  if(!ch&&S.tab<cr&&S.m[S.tab].every(x=>x.done))h+=`<div class="next"><span>${ROUNDS[S.tab]} 끝! 🎉</span><button class="dice" onclick="setTab(${cr})">${ROUNDS[cr]}로 가기 ▶</button></div>`;
   h+=`<div class="matches">${S.m[S.tab].map((_,i)=>matchCard(S.tab,i)).join('')}</div>`;
   h+=`<section class="over"><h2>전체 대진표</h2><p class="sub">노란색이 이긴 팀이에요</p><div class="bracket">${miniBracket()}</div></section>`;
   app.innerHTML=h;
