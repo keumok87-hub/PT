@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>주사위 축구 토너먼트</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;700&display=swap">
+<style>
+/* Layout: 한 화면에 라운드 탭 + 경기 카드, 아래에 전체 대진표 */
+:root{
+  --bg:#e6f5ea; --card:#ffffff; --ink:#12301f; --muted:#5b7565;
+  --pitch:#1f9d55; --pitch-d:#157a41; --dice:#ff8a1f; --line:#cfe5d6; --win:#fff3c4; --lose:#8aa595;
+  --display:'Jua','Noto Sans KR',system-ui,sans-serif; --body:'Noto Sans KR',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1f14; --card:#16301f; --ink:#e8f6ec; --muted:#9ab8a6; --pitch:#2fbf6c; --pitch-d:#25a05a;
+  --dice:#ffa24a; --line:#2a4a35; --win:#4a4216; --lose:#6f8d7b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1f14; --card:#16301f; --ink:#e8f6ec; --muted:#9ab8a6; --pitch:#2fbf6c; --pitch-d:#25a05a;
+  --dice:#ffa24a; --line:#2a4a35; --win:#4a4216; --lose:#6f8d7b; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;
+  padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:980px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance}
+h1{font-size:clamp(28px,6vw,44px);line-height:1.15}
+.sub{color:var(--muted);margin:6px 0 20px}
+button{font-family:var(--display);font-size:18px;border:0;border-radius:14px;padding:12px 18px;cursor:pointer;
+  background:var(--pitch);color:#fff;box-shadow:0 4px 0 var(--pitch-d);transition:transform .08s}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 var(--pitch-d)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--dice);outline-offset:2px}
+button.alt{background:var(--card);color:var(--ink);box-shadow:0 4px 0 var(--line);border:2px solid var(--line)}
+button.dice{background:var(--dice);box-shadow:0 4px 0 #c2610a;color:#fff}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* setup */
+.teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:0 0 18px}
+.team-in{display:flex;align-items:center;gap:8px;background:var(--card);border:2px solid var(--line);border-radius:14px;padding:6px 10px}
+.team-in b{font-family:var(--display);font-weight:400;color:var(--pitch);min-width:22px;text-align:right}
+.team-in input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:17px;padding:8px 2px}
+.team-in input:focus-visible{outline:none}
+.team-in:focus-within{border-color:var(--pitch)}
+.msg{color:#d6361f;min-height:24px;margin:0 0 8px;font-weight:700}
+
+/* tabs */
+.tabs{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+.tab{background:var(--card);color:var(--ink);border:2px solid var(--line);box-shadow:none;padding:8px 16px;font-size:18px}
+.tab[aria-selected="true"]{background:var(--pitch);color:#fff;border-color:var(--pitch)}
+.tab:disabled{opacity:.4}
+.tab .n{font-family:var(--body);font-size:13px;opacity:.85;margin-left:4px}
+
+/* match */
+.matches{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.match{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:14px;min-width:0}
+.match.done{border-color:var(--pitch)}
+.match h3{font-size:15px;color:var(--muted);margin-bottom:10px;font-family:var(--body);font-weight:700}
+.vs{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.side{text-align:center;min-width:0;padding:8px 4px;border-radius:14px}
+.side.win{background:var(--win)}
+.side.lose{color:var(--lose)}
+.name{font-family:var(--display);font-size:20px;overflow-wrap:anywhere;line-height:1.2;min-height:2.4em;display:flex;align-items:center;justify-content:center}
+.die{width:64px;height:64px;margin:6px auto 0;border-radius:14px;background:#fff;color:#12301f;border:3px solid var(--ink);
+  display:grid;place-items:center;font-family:var(--display);font-size:38px;line-height:1}
+.die.rolling{animation:shake .25s infinite}
+@keyframes shake{0%{transform:rotate(-8deg)}50%{transform:rotate(8deg) translateY(-3px)}100%{transform:rotate(-8deg)}}
+.mid{font-family:var(--display);font-size:26px;text-align:center;min-width:64px}
+.mid small{display:block;font-family:var(--body);font-size:12px;color:var(--muted)}
+.actions{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.actions .dice{width:100%}
+details{font-size:14px;color:var(--muted)}
+summary{cursor:pointer;padding:4px 0}
+.manual{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
+.manual input{width:64px;font:inherit;font-size:18px;padding:8px;border:2px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);text-align:center}
+.manual button{font-size:15px;padding:8px 14px}
+.wait{color:var(--muted);text-align:center;padding:14px 0 4px}
+
+/* 승부차기 */
+.pk{margin-top:12px;border:2px dashed var(--dice);border-radius:14px;padding:10px 8px;background:var(--bg)}
+.pkrow{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.pkside{text-align:center;padding:6px 4px;border-radius:12px;min-width:0}
+.pkside.win{background:var(--win);box-shadow:0 0 0 3px var(--dice)}
+.pkname{font-family:var(--display);font-size:16px;overflow-wrap:anywhere}
+.die.sm{width:52px;height:52px;font-size:30px}
+.pkmid{font-family:var(--display);color:var(--dice);font-size:16px}
+.pkn{margin:10px 0 0;text-align:center;font-family:var(--display);font-size:19px;min-height:1.4em}
+.next{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;background:var(--win);border-radius:16px;padding:12px 16px;margin:0 0 14px;font-family:var(--display);font-size:20px}
+
+/* overview bracket */
+.over{margin-top:34px}
+.bracket{display:flex;gap:18px;overflow-x:auto;padding:4px 2px 12px}
+.col{display:flex;flex-direction:column;justify-content:space-around;gap:8px;min-width:150px;flex:1}
+.col h4{font-family:var(--display);font-weight:400;text-align:center;margin:0 0 2px;color:var(--pitch)}
+.mini{background:var(--card);border:2px solid var(--line);border-radius:12px;font-size:14px;overflow:hidden}
+.mini div{display:flex;justify-content:space-between;gap:8px;padding:5px 9px}
+.mini div+div{border-top:1px solid var(--line)}
+.mini .w{background:var(--win);font-weight:700}
+.mini .l{color:var(--lose)}
+.mini span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* champion */
+.champ{background:linear-gradient(135deg,#ffd54a,#ff9f1c);color:#3a2200;border-radius:22px;padding:22px 16px;text-align:center;margin:0 0 18px;position:relative;overflow:hidden}
+.champ h2{font-size:clamp(26px,6vw,42px)}
+.champ p{margin:6px 0 0;font-weight:700}
+.bits{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:20}
+.bits i{position:absolute;top:-20px;width:10px;height:14px;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+@media (prefers-reduced-motion:reduce){.die.rolling{animation:none}.bits{display:none}button{transition:none}}
+.top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start}
+</style>
+
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="bits" id="bits" aria-hidden="true"></div>
+
+<script>
+const ROUNDS=['16강','8강','4강','결승'];
+const SAMPLE=['대한민국','브라질','아르헨티나','프랑스','독일','스페인','잉글랜드','포르투갈','일본','네덜란드','이탈리아','벨기에','크로아티아','우루과이','멕시코','미국'];
+const KEY='dice-soccer-v1';
+const FACES=['⚀','⚁','⚂','⚃','⚄','⚅'];
+let S=null;      // 진행 상태: {teams, m:[[{a,b,sa,sb,pk,done}]], tab}
+let draft=Array(16).fill('');
+let rolling=false, msg='';
+
+const $=s=>document.querySelector(s);
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function save(){try{localStorage.setItem(KEY,JSON.stringify({S,draft}))}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY)||'null');if(d){S=d.S;draft=d.draft||draft}}catch(e){}}
+
+function newGame(teams){
+  const m=[8,4,2,1].map(n=>Array.from({length:n},()=>({a:null,b:null,sa:null,sb:null,pk:null,done:false})));
+  teams.forEach((t,i)=>{m[0][i>>1][i%2?'b':'a']=t});
+  S={teams,m,tab:0};
+  save();render();
+}
+function curRound(){for(let r=0;r<4;r++)if(S.m[r].some(x=>!x.done))return r;return 4}
+function champion(){const f=S.m[3][0];return f.done?(f.sa>f.sb||(f.sa===f.sb&&f.pk[0]>f.pk[1])?f.a:f.b):null}
+function winnerOf(x){return x.sa>x.sb?x.a:x.sa<x.sb?x.b:(x.pk[0]>x.pk[1]?x.a:x.b)}
+const d6=()=>1+Math.floor(Math.random()*6);
+
+function record(r,i,sa,sb){
+  const x=S.m[r][i];
+  x.sa=sa;x.sb=sb;x.pk=null;
+  if(sa===sb){x.tie=true;save();render();return} // 동점: 승부차기 버튼을 눌러야 진행
+  finish(r,i);
+}
+function finish(r,i){
+  const x=S.m[r][i];
+  x.tie=false;x.done=true;
+  if(r<3){S.m[r+1][i>>1][i%2?'b':'a']=winnerOf(x)}
+  save();
+  if(champion())confetti();
+  render();
+}
+function pkRoll(r,i){
+  if(rolling)return;
+  rolling=true;
+  const x=S.m[r][i];
+  const pa=$('#pa'+i),pb=$('#pb'+i),note=$('#pkn'+i);
+  document.querySelectorAll('.actions button').forEach(b=>b.disabled=true);
+  const go=()=>{
+    pa.classList.add('rolling');pb.classList.add('rolling');
+    pa.closest('.pk').querySelectorAll('.pkside').forEach(e=>e.classList.remove('win'));
+    note.textContent='승부차기 주사위가 굴러가요...';
+    const t=setInterval(()=>{pa.textContent=d6();pb.textContent=d6()},90);
+    setTimeout(()=>{
+      clearInterval(t);
+      const a=d6(),b=d6();
+      pa.textContent=a;pb.textContent=b;
+      pa.classList.remove('rolling');pb.classList.remove('rolling');
+      if(a===b){note.textContent=`또 ${a} : ${b} 같아요! 다시 던져요`;setTimeout(go,2000);return}
+      (a>b?pa:pb).closest('.pkside').classList.add('win');
+      note.textContent=`${a>b?x.a:x.b} 승리! (승부차기 ${a} : ${b})`;
+      setTimeout(()=>{x.pk=[a,b];rolling=false;finish(r,i)},3500);
+    },1500);
+  };
+  go();
+}
+function pkBlock(i,x){
+  const w=x.pk?winnerOf(x):null;
+  const side=(n,id,v,isW)=>`<div class="pkside${isW?' win':''}"><div class="pkname">${esc(n)}</div><div class="die sm" id="${id}">${v}</div></div>`;
+  return `<div class="pk"><div class="pkrow">${side(x.a,'pa'+i,x.pk?x.pk[0]:'🎲',w===x.a)}<div class="pkmid">승부차기</div>${side(x.b,'pb'+i,x.pk?x.pk[1]:'🎲',w===x.b)}</div>
+  <p class="pkn" id="pkn${i}">${x.pk?`${esc(w)} 승리! (승부차기 ${x.pk[0]} : ${x.pk[1]})`:'동점이에요! 승부차기 주사위로 승부를 가려요'}</p></div>`;
+}
+
+function roll(r,i){
+  if(rolling)return;
+  rolling=true;
+  const x=S.m[r][i];
+  const da=$('#da'+i),db=$('#db'+i);
+  [da,db].forEach(e=>e.classList.add('rolling'));
+  document.querySelectorAll('.dice,.actions button').forEach(b=>b.disabled=true);
+  const t=setInterval(()=>{da.textContent=d6();db.textContent=d6()},80);
+  setTimeout(()=>{
+    clearInterval(t);
+    const a=d6(),b=d6();
+    da.textContent=a;db.textContent=b;
+    da.classList.remove('rolling');db.classList.remove('rolling');
+    setTimeout(()=>{rolling=false;record(r,i,a,b)},650);
+  },1000);
+}
+function manual(r,i){
+  const a=parseInt($('#ma'+i).value,10),b=parseInt($('#mb'+i).value,10);
+  if(!(a>=0&&b>=0&&a<=99&&b<=99))return;
+  record(r,i,a,b);
+}
+
+function matchCard(r,i){
+  const x=S.m[r][i];
+  const ready=x.a&&x.b;
+  let h=`<div class="match${x.done?' done':''}"><h3>${ROUNDS[r]} 경기 ${i+1}</h3><div class="vs">`;
+  const wA=x.done&&winnerOf(x)===x.a, wB=x.done&&winnerOf(x)===x.b;
+  const side=(n,id,sc,w,l)=>`<div class="side${w?' win':''}${l?' lose':''}"><div class="name">${n?esc(n):'?'}</div><div class="die" id="${id}">${sc===null?'🎲':sc}</div></div>`;
+  h+=side(x.a,'da'+i,x.sa,wA,x.done&&!wA)+`<div class="mid">${x.done||x.tie?`${x.sa} : ${x.sb}${x.tie?'<small>동점!</small>':x.pk?`<small>승부차기 ${x.pk[0]}:${x.pk[1]}</small>`:''}`:'VS'}</div>`+side(x.b,'db'+i,x.sb,wB,x.done&&!wB);
+  h+='</div>';
+  if(x.tie){h+=pkBlock(i,x)+`<div class="actions"><button class="dice" onclick="pkRoll(${r},${i})">⚽ 승부차기 던지기!</button></div>`}
+  else if(x.done){h+=(x.pk?pkBlock(i,x):'')+`<p class="wait">🏆 ${esc(winnerOf(x))} 승!</p>`}
+  else if(ready){
+    h+=`<div class="actions"><button class="dice" onclick="roll(${r},${i})">🎲 주사위 던지기</button>
+    <details><summary>진짜 주사위로 던졌어요 (직접 입력)</summary>
+    <div class="manual"><input id="ma${i}" type="number" min="0" max="99" value="0" aria-label="${esc(x.a)} 점수"> :
+    <input id="mb${i}" type="number" min="0" max="99" value="0" aria-label="${esc(x.b)} 점수">
+    <button class="alt" onclick="manual(${r},${i})">기록</button></div></details></div>`;
+  } else h+='<p class="wait">앞 경기가 끝나면 열려요</p>';
+  return h+'</div>';
+}
+
+function miniBracket(){
+  return ROUNDS.map((n,r)=>`<div class="col"><h4>${n}</h4>${S.m[r].map(x=>{
+    const w=x.done?winnerOf(x):null;
+    const row=(t,s,isW)=>`<div class="${x.done?(isW?'w':'l'):''}"><span>${t?esc(t):'?'}</span><span>${x.done?s:''}</span></div>`;
+    return `<div class="mini">${row(x.a,x.sa,w===x.a)}${row(x.b,x.sb,w===x.b)}</div>`}).join('')}</div>`).join('');
+}
+
+function render(){
+  const app=$('#app');
+  if(!S){
+    app.innerHTML=`<h1>⚽ 주사위 축구 토너먼트</h1>
+    <p class="sub">16팀 이름을 적고 시작하세요. 주사위를 던져 나온 숫자가 골 수예요. 16강, 8강, 4강을 지나 우승팀까지 가요!</p>
+    <div class="teams">${draft.map((t,i)=>`<label class="team-in"><b>${i+1}</b><input id="t${i}" maxlength="14" placeholder="팀 이름" value="${esc(t)}" autocomplete="off"></label>`).join('')}</div>
+    <p class="msg" id="msg">${esc(msg)}</p>
+    <div class="row"><button onclick="start()">⚽ 시작하기</button>
+    <button class="alt" onclick="sample()">예시 팀 채우기</button>
+    <button class="alt" onclick="shuffleNames()">팀 섞기 (추첨)</button></div>`;
+    app.querySelectorAll('.team-in input').forEach((el,i)=>el.addEventListener('input',()=>{draft[i]=el.value;save()}));
+    return;
+  }
+  const cr=curRound(), ch=champion();
+  let h=`<div class="top"><div><h1>⚽ 주사위 축구 토너먼트</h1><p class="sub">${ch?'모든 경기가 끝났어요!':ROUNDS[cr]+'을 진행 중이에요'}</p></div>
+    <button class="alt" id="rs" onclick="resetAsk()">처음부터 다시</button></div>`;
+  if(ch)h+=`<div class="champ"><h2>🏆 우승! ${esc(ch)} 🏆</h2><p>축하해요! 최고의 팀이에요</p></div>`;
+  h+=`<div class="tabs" role="tablist">${ROUNDS.map((n,r)=>{
+    const done=S.m[r].filter(x=>x.done).length;
+    return `<button class="tab" role="tab" aria-selected="${S.tab===r}" ${r>cr&&!ch?'disabled':''} onclick="setTab(${r})">${n}<span class="n">${done}/${S.m[r].length}</span></button>`}).join('')}</div>`;
+  if(!ch&&S.tab<cr&&S.m[S.tab].every(x=>x.done))h+=`<div class="next"><span>${ROUNDS[S.tab]} 끝! 🎉</span><button class="dice" onclick="setTab(${cr})">${ROUNDS[cr]}로 가기 ▶</button></div>`;
+  h+=`<div class="matches">${S.m[S.tab].map((_,i)=>matchCard(S.tab,i)).join('')}</div>`;
+  h+=`<section class="over"><h2>전체 대진표</h2><p class="sub">노란색이 이긴 팀이에요</p><div class="bracket">${miniBracket()}</div></section>`;
+  app.innerHTML=h;
+}
+function setTab(r){if(rolling)return;S.tab=r;save();render()}
+function sample(){draft=SAMPLE.slice();render();save()}
+function shuffleNames(){
+  const names=draft.map(t=>t.trim());
+  for(let i=names.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[names[i],names[j]]=[names[j],names[i]]}
+  draft=names;render();save();
+}
+function start(){
+  const names=draft.map(t=>t.trim());
+  const empty=names.findIndex(t=>!t);
+  if(empty>=0){msg=`${empty+1}번 팀 이름이 비어 있어요. 16팀을 모두 적어 주세요.`;render();const el=$('#t'+empty);el&&el.focus();return}
+  if(new Set(names).size<16){msg='같은 이름의 팀이 있어요. 이름을 서로 다르게 적어 주세요.';render();return}
+  msg='';newGame(names);
+}
+function resetAsk(){
+  const b=$('#rs');
+  if(b.dataset.ask){S=null;msg='';try{localStorage.removeItem(KEY)}catch(e){}render();return}
+  b.dataset.ask=1;b.textContent='정말 지울까요? 한 번 더 누르세요';
+  setTimeout(()=>{if(b.isConnected){delete b.dataset.ask;b.textContent='처음부터 다시'}},3500);
+}
+function confetti(){
+  const box=$('#bits');box.innerHTML='';
+  const cols=['#ff8a1f','#ffd54a','#1f9d55','#2a7de1','#e8453c','#a95bd6'];
+  for(let i=0;i<70;i++){
+    const e=document.createElement('i');
+    e.style.left=Math.random()*100+'vw';
+    e.style.background=cols[i%cols.length];
+    e.style.animationDuration=(2.5+Math.random()*2.5)+'s';
+    e.style.animationDelay=(Math.random()*0.8)+'s';
+    box.appendChild(e);
+  }
+  setTimeout(()=>{box.innerHTML=''},6500);
+}
+load();render();
+</script>
+
+</body>
+</html>
